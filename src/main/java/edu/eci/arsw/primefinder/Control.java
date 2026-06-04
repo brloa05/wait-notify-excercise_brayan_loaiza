@@ -2,6 +2,11 @@ package edu.eci.arsw.primefinder;
 
 import java.util.Scanner;
 
+/**
+ * Controller thread that manages the prime-finder worker threads.
+ * Every {@value #TMILISECONDS} ms it pauses all workers, prints progress,
+ * and waits for the user to press ENTER before resuming them.
+ */
 public class Control extends Thread {
 
     private static final int NTHREADS = 3;
@@ -11,7 +16,7 @@ public class Control extends Thread {
     private final int NDATA = MAXVALUE / NTHREADS;
     private final PrimeFinderThread[] pft;
 
-
+    /** Shared monitor used to synchronize pause and resume operations. */
     final Object lock = new Object();
     private boolean paused = false;
     private int pausedWorkers = 0;
@@ -27,10 +32,19 @@ public class Control extends Thread {
         pft[i] = new PrimeFinderThread(i * NDATA, MAXVALUE + 1, this);
     }
 
+    /**
+     * Creates and initializes a new {@code Control} instance.
+     *
+     * @return a new instance ready to start
+     */
     public static Control newControl() {
         return new Control();
     }
 
+    /**
+     * Starts the worker threads and enters the periodic pause loop.
+     * Exits when all workers have finished.
+     */
     @Override
     public void run() {
         for (PrimeFinderThread t : pft) t.start();
@@ -53,7 +67,6 @@ public class Control extends Thread {
                     break;
                 }
 
-
                 paused = true;
                 while (pausedWorkers < activeWorkers) {
                     try {
@@ -67,7 +80,6 @@ public class Control extends Thread {
                 }
                 active = activeWorkers;
             }
-
 
             int total = 0;
             for (PrimeFinderThread t : pft) total += t.getPrimes().size();
@@ -87,6 +99,12 @@ public class Control extends Thread {
         }
     }
 
+    /**
+     * Called by each worker on every iteration; blocks the thread while
+     * the controller is in a paused state.
+     *
+     * @throws InterruptedException if the thread is interrupted while waiting
+     */
     void checkPause() throws InterruptedException {
         synchronized (lock) {
             while (paused) {
@@ -98,7 +116,10 @@ public class Control extends Thread {
         }
     }
 
-
+    /**
+     * Called by a worker when it finishes its range; decrements the active
+     * worker count and notifies the controller.
+     */
     void workerFinished() {
         synchronized (lock) {
             activeWorkers--;
